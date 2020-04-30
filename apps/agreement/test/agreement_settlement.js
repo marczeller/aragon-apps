@@ -115,26 +115,17 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
                 assertBn(currentActionState.settingId, previousActionState.settingId, 'action setting ID does not match')
               })
 
-              it('slashes the submitter challenged balance', async () => {
+              it('slashes the submitter locked balance', async () => {
                 const { settlementOffer } = await agreement.getChallenge(actionId)
-                const { available: previousAvailableBalance, challenged: previousChallengedBalance } = await agreement.getSigner(submitter)
+                const { available: previousAvailableBalance, locked: previousLockedBalance } = await agreement.getSigner(submitter)
 
                 await agreement.settle({ actionId, from })
 
-                const { available: currentAvailableBalance, challenged: currentChallengedBalance } = await agreement.getSigner(submitter)
+                const { available: currentAvailableBalance, locked: currentLockedBalance } = await agreement.getSigner(submitter)
 
                 const expectedUnchallengedBalance = agreement.collateralAmount.sub(settlementOffer)
-                assertBn(currentChallengedBalance, previousChallengedBalance.sub(agreement.collateralAmount), 'challenged balance does not match')
+                assertBn(currentLockedBalance, previousLockedBalance.sub(agreement.collateralAmount), 'challenged balance does not match')
                 assertBn(currentAvailableBalance, previousAvailableBalance.add(expectedUnchallengedBalance), 'available balance does not match')
-              })
-
-              it('does not affect the locked balance of the submitter', async () => {
-                const { locked: previousLockedBalance } = await agreement.getSigner(submitter)
-
-                await agreement.settle({ actionId, from })
-
-                const { locked: currentLockedBalance } = await agreement.getSigner(submitter)
-                assertBn(currentLockedBalance, previousLockedBalance, 'locked balance does not match')
               })
 
               it('transfers the settlement offer and the collateral to the challenger', async () => {

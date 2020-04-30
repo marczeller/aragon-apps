@@ -74,6 +74,10 @@ class AgreementDeployer {
     return this.previousDeploy.arbitratorToken
   }
 
+  get stakingFactory() {
+    return this.previousDeploy.stakingFactory
+  }
+
   get signPermissionToken() {
     return this.previousDeploy.signPermissionToken
   }
@@ -96,10 +100,13 @@ class AgreementDeployer {
     const arbitrator = options.arbitrator || this.arbitrator
     const collateralToken = options.collateralToken || this.collateralToken
 
+    const Staking = this._getContract('Staking')
+    const staking = await Staking.at(await this.agreement.staking())
+
     const { content, delayPeriod, settlementPeriod, collateralAmount, challengeCollateral } = await this.agreement.getSetting(0)
     const initialSetting = { content, delayPeriod, settlementPeriod, collateralAmount, challengeCollateral }
 
-    return new AgreementHelper(this.artifacts, this.web3, this.agreement, arbitrator, collateralToken, initialSetting)
+    return new AgreementHelper(this.artifacts, this.web3, this.agreement, arbitrator, staking, collateralToken, initialSetting)
   }
 
   async deployAndInitialize(options = {}) {
@@ -110,6 +117,9 @@ class AgreementDeployer {
 
     if (!options.arbitrator && !this.arbitrator) await this.deployArbitrator(options)
     const arbitrator = options.arbitrator || this.arbitrator
+
+    if (!options.stakingFactory && !this.stakingFactory) await this.deployStakingFactory()
+    const stakingFactory = options.stakingFactory || this.stakingFactory
 
     const defaultOptions = { ...DEFAULT_INITIALIZE_OPTIONS, ...options }
     const { title, content, collateralAmount, delayPeriod, settlementPeriod, challengeCollateral } = defaultOptions
@@ -130,7 +140,7 @@ class AgreementDeployer {
       for (const challenger of challengers) await challengePermissionToken.generateTokens(challenger, challengePermissionBalance)
     }
 
-    await this.agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance)
+    await this.agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance, stakingFactory.address)
     return this.agreement
   }
 
@@ -210,6 +220,13 @@ class AgreementDeployer {
     const arbitratorToken = await this.deployToken({ name, decimals, symbol })
     this.previousDeploy = { ...this.previousDeploy, arbitratorToken }
     return arbitratorToken
+  }
+
+  async deployStakingFactory() {
+    const StakingFactory = this._getContract('StakingFactory')
+    const stakingFactory = await StakingFactory.new()
+    this.previousDeploy = { ...this.previousDeploy, stakingFactory }
+    return stakingFactory
   }
 
   async deployBase() {

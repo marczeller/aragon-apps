@@ -106,8 +106,7 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
 
                     const receipt = await agreement.dispute({ actionId, from, arbitrationFees })
 
-                    const IArbitrator = artifacts.require('ArbitratorMock')
-                    const logs = decodeEventsOfType(receipt, IArbitrator.abi, 'NewDispute')
+                    const logs = decodeEventsOfType(receipt, agreement.arbitrator.abi, 'NewDispute')
                     const disputeId = getEventArgument({ logs }, 'NewDispute', 'disputeId');
 
                     const currentChallengeState = await agreement.getChallenge(actionId)
@@ -139,8 +138,7 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
                   it('creates a dispute', async () => {
                     const receipt = await agreement.dispute({ actionId, from, arbitrationFees })
 
-                    const IArbitrator = artifacts.require('ArbitratorMock')
-                    const logs = decodeEventsOfType(receipt, IArbitrator.abi, 'NewDispute')
+                    const logs = decodeEventsOfType(receipt, agreement.arbitrator.abi, 'NewDispute')
                     const { disputeId } = await agreement.getChallenge(actionId)
 
                     assertAmountOfEvents({ logs }, 'NewDispute', 1)
@@ -155,8 +153,7 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
                   it('submits both parties context as evidence', async () => {
                     const receipt = await agreement.dispute({ actionId, from, arbitrationFees })
 
-                    const IArbitrable = artifacts.require('IArbitrable')
-                    const logs = decodeEventsOfType(receipt, IArbitrable.abi, 'EvidenceSubmitted')
+                    const logs = decodeEventsOfType(receipt, agreement.abi, 'EvidenceSubmitted')
                     const { disputeId } = await agreement.getChallenge(actionId)
 
                     assertAmountOfEvents({ logs }, 'EvidenceSubmitted', 2)
@@ -165,14 +162,13 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
                   })
 
                   it('does not affect the submitter staked balances', async () => {
-                    const previousBalance = await agreement.getSigner(submitter)
+                    const { locked: previousLockedBalance, available: previousAvailableBalance } = await agreement.getSigner(submitter)
 
                     await agreement.dispute({ actionId, from, arbitrationFees })
 
-                    const currentBalance = await agreement.getSigner(submitter)
-                    assertBn(currentBalance.available, previousBalance.available, 'available balance does not match')
-                    assertBn(currentBalance.locked, previousBalance.locked, 'locked balance does not match')
-                    assertBn(currentBalance.challenged, previousBalance.challenged, 'challenged balance does not match')
+                    const { locked: currentLockedBalance, available: currentAvailableBalance } = await agreement.getSigner(submitter)
+                    assertBn(currentAvailableBalance, previousAvailableBalance, 'available balance does not match')
+                    assertBn(currentLockedBalance, previousLockedBalance, 'locked balance does not match')
                   })
 
                   it('does not affect token balances', async () => {
@@ -240,7 +236,7 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
                 })
 
                 it('reverts', async () => {
-                  await assertRevert(agreement.dispute({ actionId, arbitrationFees }), ERRORS.ERROR_ARBITRATOR_FEE_DEPOSIT_FAILED)
+                  await assertRevert(agreement.dispute({ actionId, arbitrationFees }), ERRORS.ERROR_ARBITRATOR_FEE_TRANSFER_FAILED)
                 })
               })
 
@@ -250,7 +246,7 @@ contract('Agreement', ([_, someone, submitter, challenger]) => {
                 })
 
                 it('reverts', async () => {
-                  await assertRevert(agreement.dispute({ actionId, arbitrationFees }), ERRORS.ERROR_ARBITRATOR_FEE_DEPOSIT_FAILED)
+                  await assertRevert(agreement.dispute({ actionId, arbitrationFees }), ERRORS.ERROR_ARBITRATOR_FEE_TRANSFER_FAILED)
                 })
               })
             }

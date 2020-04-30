@@ -4,13 +4,18 @@ const { getEventArgument } = require('@aragon/contract-test-helpers/events')
 const { encodeCallScript } = require('@aragon/contract-test-helpers/evmScript')
 
 class AgreementHelper {
-  constructor(artifacts, web3, agreement, arbitrator, collateralToken, setting = {}) {
+  constructor(artifacts, web3, agreement, arbitrator, staking, collateralToken, setting = {}) {
     this.artifacts = artifacts
     this.web3 = web3
     this.agreement = agreement
+    this.staking = staking
     this.arbitrator = arbitrator
     this.collateralToken = collateralToken
     this.setting = setting
+  }
+
+  get abi() {
+    return this.agreement.abi
   }
 
   get address() {
@@ -38,8 +43,8 @@ class AgreementHelper {
   }
 
   async getSigner(signer) {
-    const { available, locked, challenged, lastActionId, shouldReviewCurrentSetting } = await this.agreement.getSigner(signer)
-    return { available, locked, challenged, lastActionId, shouldReviewCurrentSetting }
+    const { available, locked, lastActionId, shouldReviewCurrentSetting } = await this.agreement.getSigner(signer)
+    return { available, locked, lastActionId, shouldReviewCurrentSetting }
   }
 
   async getAction(actionId) {
@@ -83,18 +88,18 @@ class AgreementHelper {
     return { canCancel, canChallenge, canSettle, canDispute, canClaimSettlement, canRuleDispute, canExecute }
   }
 
-  async approve({ amount, from = undefined, accumulate = true }) {
+  async approve({ to, amount, from = undefined, accumulate = true }) {
     if (!from) from = await this._getSender()
 
     await this.collateralToken.generateTokens(from, amount)
-    return this.safeApprove(this.collateralToken, from, this.address, amount, accumulate)
+    return this.safeApprove(this.collateralToken, from, to, amount, accumulate)
   }
 
   async approveAndCall({ amount, from = undefined, mint = true }) {
     if (!from) from = await this._getSender()
 
     if (mint) await this.collateralToken.generateTokens(from, amount)
-    return this.collateralToken.approveAndCall(this.address, amount, '0x', { from })
+    return this.collateralToken.approveAndCall(this.staking.address, amount, '0x', { from })
   }
 
   async stake({ signer = undefined, amount = undefined, from = undefined, approve = undefined }) {
@@ -103,11 +108,11 @@ class AgreementHelper {
     if (amount === undefined) amount = this.collateralAmount
 
     if (approve === undefined) approve = amount
-    if (approve) await this.approve({ amount: approve, from })
+    if (approve) await this.approve({ amount: approve, to: this.staking.address, from })
 
     return (signer === from)
-      ? this.agreement.stake(amount, { from: signer })
-      : this.agreement.stakeFor(signer, amount, { from })
+      ? this.staking.stake(amount, { from: signer })
+      : this.staking.stakeFor(signer, amount, { from })
   }
 
   async unstake({ signer, amount = undefined }) {
@@ -116,7 +121,7 @@ class AgreementHelper {
       amount = available
     }
 
-    return this.agreement.unstake(amount, { from: signer })
+    return this.staking.unstake(amount, { from: signer })
   }
 
   async forward({ script = undefined, from }) {
@@ -146,7 +151,7 @@ class AgreementHelper {
     if (arbitrationFees) await this.approveArbitrationFees({ amount: arbitrationFees, from: challenger })
 
     if (stake === undefined) stake = this.challengeCollateral
-    if (stake) await this.approve({ amount: stake, from: challenger })
+    if (stake) await this.approve({ amount: stake, to: this.address, from: challenger })
 
     return this.agreement.challengeAction(actionId, settlementOffer, challengeContext, { from: challenger })
   }

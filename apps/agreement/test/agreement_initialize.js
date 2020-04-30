@@ -10,7 +10,7 @@ const { decodeEventsOfType } = require('./helpers/lib/decodeEvent')
 const deployer = require('./helpers/utils/deployer')(web3, artifacts)
 
 contract('Agreement', ([_, EOA]) => {
-  let arbitrator, collateralToken, signPermissionToken, challengePermissionToken, agreement
+  let arbitrator, stakingFactory, collateralToken, signPermissionToken, challengePermissionToken, agreement
 
   const title = 'Sample Agreement'
   const content = '0xabcd'
@@ -23,6 +23,7 @@ contract('Agreement', ([_, EOA]) => {
 
   before('deploy instances', async () => {
     arbitrator = await deployer.deployArbitrator()
+    stakingFactory = await deployer.deployStakingFactory()
     collateralToken = await deployer.deployCollateralToken()
     signPermissionToken = await deployer.deploySignPermissionToken()
     challengePermissionToken = await deployer.deployChallengePermissionToken()
@@ -34,36 +35,40 @@ contract('Agreement', ([_, EOA]) => {
       const base = deployer.base
 
       assert(await base.isPetrified(), 'base agreement contract should be petrified')
-      await assertRevert(base.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance), 'INIT_ALREADY_INITIALIZED')
+      await assertRevert(base.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance, stakingFactory.address), 'INIT_ALREADY_INITIALIZED')
     })
 
     context('when the initialization fails', () => {
       it('fails when using a non-contract collateral token', async () => {
         const collateralToken = EOA
 
-        await assertRevert(agreement.initialize(title, content, collateralToken, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance), ERRORS.ERROR_COLLATERAL_TOKEN_NOT_CONTRACT)
+        await assertRevert(agreement.initialize(title, content, collateralToken, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance, stakingFactory.address), ERRORS.ERROR_COLLATERAL_TOKEN_NOT_CONTRACT)
       })
 
       it('fails when using a non-contract arbitrator', async () => {
         const court = EOA
 
-        await assertRevert(agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, court, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance), ERRORS.ERROR_ARBITRATOR_NOT_CONTRACT)
+        await assertRevert(agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, court, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance, stakingFactory.address), ERRORS.ERROR_ARBITRATOR_NOT_CONTRACT)
       })
     })
 
     context('when the initialization succeeds', () => {
       before('initialize agreement DAO', async () => {
-        const receipt = await agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance)
+        const receipt = await agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance, stakingFactory.address)
 
         const settingChangedLogs = decodeEventsOfType(receipt, deployer.abi, EVENTS.SETTING_CHANGED)
         assertEvent({ logs: settingChangedLogs }, EVENTS.SETTING_CHANGED, { settingId: 0 })
 
         const permissionChangedLogs = decodeEventsOfType(receipt, deployer.abi, EVENTS.PERMISSION_CHANGED)
         assertEvent({ logs: permissionChangedLogs }, EVENTS.PERMISSION_CHANGED, { signToken: signPermissionToken.address, signBalance: signPermissionBalance, challengeToken: challengePermissionToken.address, challengeBalance: challengePermissionBalance })
+
+        const staking = await agreement.staking()
+        const stakingDeployedLogs = decodeEventsOfType(receipt, stakingFactory.abi, 'NewStaking')
+        assertEvent({ logs: stakingDeployedLogs }, 'NewStaking', { agreement: agreement.address, staking })
       })
 
       it('cannot be initialized again', async () => {
-        await assertRevert(agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance), ERRORS.ERROR_ALREADY_INITIALIZED)
+        await assertRevert(agreement.initialize(title, content, collateralToken.address, collateralAmount, challengeCollateral, arbitrator.address, delayPeriod, settlementPeriod, signPermissionToken.address, signPermissionBalance, challengePermissionToken.address, challengePermissionBalance, stakingFactory.address), ERRORS.ERROR_ALREADY_INITIALIZED)
       })
 
       it('initializes the agreement setting', async () => {

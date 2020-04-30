@@ -60,15 +60,6 @@ contract('Agreement', ([_, owner, submitter]) => {
             assertBn(currentAvailableBalance, previousAvailableBalance.sub(collateralAmount), 'available balance does not match')
           })
 
-          it('does not affect the challenged balance', async () => {
-            const { challenged: previousChallengedBalance } = await agreement.getSigner(submitter)
-
-            await agreement.schedule({ submitter, script, actionContext, stake })
-
-            const { challenged: currentChallengedBalance } = await agreement.getSigner(submitter)
-            assertBn(currentChallengedBalance, previousChallengedBalance, 'challenged balance does not match')
-          })
-
           it('does not affect token balances', async () => {
             const { collateralToken } = agreement
             const previousSubmitterBalance = await collateralToken.balanceOf(submitter)
@@ -135,14 +126,14 @@ contract('Agreement', ([_, owner, submitter]) => {
         })
 
         it('reverts', async () => {
-          await assertRevert(agreement.schedule({ submitter, script, actionContext, stake }), ERRORS.ERROR_NOT_ENOUGH_AVAILABLE_STAKE)
+          await assertRevert(agreement.schedule({ submitter, script, actionContext, stake }), ERRORS.ERROR_STK_NOT_ENOUGH_AVAILABLE_STAKE)
         })
       })
     })
 
     context('when the sender does not have an amount staked before', () => {
       it('reverts', async () => {
-        await assertRevert(agreement.schedule({ submitter, script, actionContext, stake }), ERRORS.ERROR_NOT_ENOUGH_AVAILABLE_STAKE)
+        await assertRevert(agreement.schedule({ submitter, script, actionContext, stake }), ERRORS.ERROR_STK_NOT_ENOUGH_AVAILABLE_STAKE)
       })
     })
   })

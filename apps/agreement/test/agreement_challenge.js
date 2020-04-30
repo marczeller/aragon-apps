@@ -38,7 +38,7 @@ contract('Agreement', ([_, submitter, challenger, someone]) => {
                 context('when the challenger has staked enough collateral', () => {
                   beforeEach('stake challenge collateral', async () => {
                     const amount = agreement.challengeCollateral
-                    await agreement.approve({ amount, from: challenger })
+                    await agreement.approve({ amount, from: challenger, to: agreement.address })
                   })
 
                   context('when the challenger has approved half of the arbitration fees', () => {
@@ -79,23 +79,14 @@ contract('Agreement', ([_, submitter, challenger, someone]) => {
                       assertBn(currentActionState.settingId, previousActionState.settingId, 'setting ID does not match')
                     })
 
-                    it('marks the submitter locked balance as challenged', async () => {
-                      const { locked: previousLockedBalance, challenged: previousChallengedBalance } = await agreement.getSigner(submitter)
+                    it('does not affect the submitter balances', async () => {
+                      const { available: previousAvailableBalance, locked: previousLockedBalance } = await agreement.getSigner(submitter)
 
                       await agreement.challenge({ actionId, challenger, settlementOffer, challengeContext, arbitrationFees, stake })
 
-                      const { locked: currentLockedBalance, challenged: currentChallengedBalance } = await agreement.getSigner(submitter)
-                      assertBn(currentLockedBalance, previousLockedBalance.sub(collateralAmount), 'locked balance does not match')
-                      assertBn(currentChallengedBalance, previousChallengedBalance.add(collateralAmount), 'challenged balance does not match')
-                    })
-
-                    it('does not affect the submitter available balance', async () => {
-                      const { available: previousAvailableBalance } = await agreement.getSigner(submitter)
-
-                      await agreement.challenge({ actionId, challenger, settlementOffer, challengeContext, arbitrationFees, stake })
-
-                      const { available: currentAvailableBalance } = await agreement.getSigner(submitter)
+                      const { available: currentAvailableBalance, locked: currentLockedBalance } = await agreement.getSigner(submitter)
                       assertBn(currentAvailableBalance, previousAvailableBalance, 'available balance does not match')
+                      assertBn(currentLockedBalance, previousLockedBalance, 'locked balance does not match')
                     })
 
                     it('transfers the challenge collateral to the contract', async () => {
@@ -188,7 +179,7 @@ contract('Agreement', ([_, submitter, challenger, someone]) => {
 
                 context('when the challenger did not stake enough collateral', () => {
                   beforeEach('remove collateral approval', async () => {
-                    await agreement.approve({ amount: 0, from: challenger, accumulate: false })
+                    await agreement.approve({ amount: 0, from: challenger, to: agreement.address, accumulate: false })
                   })
 
                   it('reverts', async () => {

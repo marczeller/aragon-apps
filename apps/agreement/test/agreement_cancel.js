@@ -50,15 +50,6 @@ contract('Agreement', ([_, submitter, someone]) => {
               assertBn(currentLockedBalance, previousLockedBalance.sub(collateralAmount), 'locked balance does not match')
               assertBn(currentAvailableBalance, previousAvailableBalance.add(collateralAmount), 'available balance does not match')
             })
-
-            it('does not affect the challenged balance', async () => {
-              const { challenged: previousChallengedBalance } = await agreement.getSigner(submitter)
-
-              await agreement.cancel({ actionId, from })
-
-              const { challenged: currentChallengedBalance } = await agreement.getSigner(submitter)
-              assertBn(currentChallengedBalance, previousChallengedBalance, 'challenged balance does not match')
-            })
           } else {
             it('does not affect the submitter staked balances', async () => {
               const previousBalance = await agreement.getSigner(submitter)
@@ -68,7 +59,6 @@ contract('Agreement', ([_, submitter, someone]) => {
               const currentBalance = await agreement.getSigner(submitter)
               assertBn(currentBalance.available, previousBalance.available, 'available balance does not match')
               assertBn(currentBalance.locked, previousBalance.locked, 'locked balance does not match')
-              assertBn(currentBalance.challenged, previousBalance.challenged, 'challenged balance does not match')
             })
           }
 

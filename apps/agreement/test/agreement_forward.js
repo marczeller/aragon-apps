@@ -9,6 +9,8 @@ const { assertAmountOfEvents, assertEvent } = require('./helpers/assert/assertEv
 
 const deployer = require('./helpers/utils/deployer')(web3, artifacts)
 
+const Staking = artifacts.require('Staking')
+
 contract('Agreement', ([_, signer]) => {
   let agreement, collateralToken
 
@@ -32,9 +34,10 @@ contract('Agreement', ([_, signer]) => {
 
     const stakeTokens = amount => {
       beforeEach('stake tokens', async () => {
+        const staking = await Staking.at(await agreement.staking())
         await collateralToken.generateTokens(signer, amount)
-        await collateralToken.approve(agreement.address, amount, { from: signer })
-        await agreement.stake(amount, { from: signer })
+        await collateralToken.approve(staking.address, amount, { from: signer })
+        await staking.stake(amount, { from: signer })
       })
     }
 
@@ -55,8 +58,8 @@ contract('Agreement', ([_, signer]) => {
     })
 
     context('when the sender stake is below the collateral amount', () => {
-      it('returns false', async () => {
-        assert.isFalse(await agreement.canForward(signer, '0x'), 'signer can forwarder')
+      it('returns true', async () => {
+        assert.isTrue(await agreement.canForward(signer, '0x'), 'signer cannot forwarder')
       })
     })
   })
@@ -96,15 +99,6 @@ contract('Agreement', ([_, signer]) => {
           const { locked: currentLockedBalance, available: currentAvailableBalance } = await agreement.getSigner(from)
           assertBn(currentLockedBalance, previousLockedBalance.add(agreement.collateralAmount), 'locked balance does not match')
           assertBn(currentAvailableBalance, previousAvailableBalance.sub(agreement.collateralAmount), 'available balance does not match')
-        })
-
-        it('does not affect the challenged balance', async () => {
-          const { challenged: previousChallengedBalance } = await agreement.getSigner(from)
-
-          await agreement.forward({ script, from })
-
-          const { challenged: currentChallengedBalance } = await agreement.getSigner(from)
-          assertBn(currentChallengedBalance, previousChallengedBalance, 'challenged balance does not match')
         })
 
         it('does not affect token balances', async () => {
@@ -148,14 +142,14 @@ contract('Agreement', ([_, signer]) => {
         })
 
         it('reverts', async () => {
-          await assertRevert(agreement.forward({ script, from }), ERRORS.ERROR_CAN_NOT_FORWARD)
+          await assertRevert(agreement.forward({ script, from }), ERRORS.ERROR_STK_NOT_ENOUGH_AVAILABLE_STAKE)
         })
       })
     })
 
     context('when the sender does not have an amount staked before', () => {
       it('reverts', async () => {
-        await assertRevert(agreement.forward({ script, from }), ERRORS.ERROR_CAN_NOT_FORWARD)
+        await assertRevert(agreement.forward({ script, from }), ERRORS.ERROR_STK_NOT_ENOUGH_AVAILABLE_STAKE)
       })
     })
   })
